@@ -1,7 +1,9 @@
 /* 
  * tsh - A tiny shell program with job control
  * 
- * <Put your name and login ID here>
+ * Author      : Yang Dong
+ * Created Time: 2020.08.09
+ * Additional feature: use WCONTINUE flag to trace continue signal outside the shell
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +14,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <assert.h>
 
 /* Misc manifest constants */
 #define MAXLINE    1024   /* max line size */
@@ -58,7 +61,7 @@ struct job_t jobs[MAXJOBS]; /* The job list */
 void eval(char *cmdline);
 int builtin_cmd(char **argv);
 void do_bgfg(char **argv);
-void waitfg(pid_t pid);
+void waitfg(pid_t pid, sigset_t prev_mask);
 
 void sigchld_handler(int sig);
 void sigtstp_handler(int sig);
@@ -147,6 +150,7 @@ int main(int argc, char **argv)
 	eval(cmdline);
 	fflush(stdout);
 	fflush(stdout);
+	usleep(1000);
     } 
 
     exit(0); /* control never reaches here */
@@ -163,8 +167,45 @@ int main(int argc, char **argv)
  * background children don't receive SIGINT (SIGTSTP) from the kernel
  * when we type ctrl-c (ctrl-z) at the keyboard.  
 */
-void eval(char *cmdline) 
-{
+
+volatile sig_atomic_t reaped, wanted_pid = -1;
+void eval(char *cmdline) {
+	static char *argv[MAXARGS];
+	sigset_t all_mask, prev_mask, child_mask, bancld_mask;
+	int bg = parseline(cmdline, argv);
+	pid_t pid;
+
+	if(sigfillset(&all_mask) < 0) unix_error("Sigfillset error (eval)");
+	if(sigemptyset(&child_mask) == -1 || sigaddset(&child_mask, SIGCHLD) == -1)
+		unix_error("Set child_mask error (eval)");
+
+	if(argv[0] == NULL) return; /* Ignore empty lines */
+	if(builtin_cmd(argv)) return; /* Deal with built-ins immediately */
+
+	reaped = 0, wanted_pid = -1;
+	/* Ban SIGCHLD to ensure bg jobs added to list before dealing with SIGCHLD */
+	if(sigprocmask(SIG_BLOCK, &child_mask, &prev_mask) < 0)
+		unix_error("Sigprocmask BLOCK child_mask error (eval)");
+	if((pid = fork()) < 0) unix_error("Fork error (eval)");
+	if(pid == 0) {
+		if(setpgid(0, 0) < 0) unix_error("Setgpid error (eval)");
+		/* Recover child mask */
+		if(sigprocmask(SIG_SETMASK, &prev_mask, &bancld_mask) < 0)
+			unix_error("Sigprocmask recover child's mask error (eval)");
+		if(execve(argv[0], argv, environ) < 0)
+			unix_error(argv[0]);
+	} else {
+		if(sigprocmask(SIG_BLOCK, &all_mask, &bancld_mask) < 0)
+			unix_error("Sigprocmask error (eval)");
+		assert(addjob(jobs, pid, bg ? BG : FG, cmdline));
+		if(sigprocmask(SIG_SETMASK, &bancld_mask, NULL) < 0)
+			unix_error("Sigprocmask error (eval)");
+		if(!bg)
+			waitfg(pid, prev_mask);
+		else printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline);
+		if(sigprocmask(SIG_SETMASK, &prev_mask, NULL) < 0)
+			unix_error("Sigprocmask error (eval)");
+	}
     return;
 }
 
@@ -231,7 +272,11 @@ int parseline(const char *cmdline, char **argv)
  */
 int builtin_cmd(char **argv) 
 {
-    return 0;     /* not a builtin command */
+	if(!strcmp(argv[0], "jobs")) listjobs(jobs);
+	else if(!strcmp(argv[0], "quit")) exit(0);
+	else if(!strcmp(argv[0], "bg") || !strcmp(argv[0], "fg")) do_bgfg(argv);
+	else return 0;     /* not a builtin command */
+	return 1;
 }
 
 /* 
@@ -239,14 +284,45 @@ int builtin_cmd(char **argv)
  */
 void do_bgfg(char **argv) 
 {
+	if(argv[1] == NULL) {
+		printf("%s: command requires PID or %%jobid argument\n", argv[0]);
+		return;
+	}
+	int ok = argv[1][0] == '%' || isdigit(argv[1][0]), len = strlen(argv[1]);
+	for(int i = 1; i < len; ++i) ok = ok && isdigit(argv[1][i]);
+	if(!ok) {
+		printf("%s argument must be a PID or %%jobid\n", argv[0]);
+		return;
+	}
+
+	int isfg = argv[0][0] == 'f', isjob = argv[1][0] == '%', num = atoi(argv[1] + isjob);
+	struct job_t *jp = isjob ? getjobjid(jobs, num) : getjobpid(jobs, num);
+	if(jp == NULL) {
+		if(isjob) printf("%%%d: No such job\n", num);
+		else printf("(%d): No such process\n", num);
+		return;
+	}
+	jp->state = isfg ? FG : BG;
+	sigset_t prev_mask, chld;
+	sigemptyset(&chld), sigaddset(&chld, SIGCHLD);
+	sigprocmask(SIG_BLOCK, &chld, &prev_mask);
+	kill(-jp->pid, SIGCONT); /* should be the WHOLE GROUP!!! */
+	wanted_pid = jp->pid, reaped = 0;
+	if(isfg) waitfg(jp->pid, prev_mask);
+	else printf("[%d] (%d) %s", jp->jid, jp->pid, jp->cmdline);
+	sigprocmask(SIG_SETMASK, &prev_mask, NULL);
     return;
 }
 
 /* 
  * waitfg - Block until process pid is no longer the foreground process
  */
-void waitfg(pid_t pid)
-{
+void waitfg(pid_t pid, sigset_t prev_mask) {
+	wanted_pid = pid;
+	reaped = 0;
+	while(wanted_pid != -1 && !reaped)
+		sigsuspend(&prev_mask);
+	wanted_pid = -1;
     return;
 }
 
@@ -263,6 +339,32 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
+	int olderrno = errno, status;
+	pid_t pid;
+	for(;;) {
+		pid = waitpid(-1, &status, WNOHANG | WUNTRACED | WCONTINUED); 
+		/* TERM & */
+		if(pid == 0 || pid == -1) break;
+		if(WIFSTOPPED(status)) {
+			struct job_t *jp = getjobpid(jobs, pid);
+			printf("Job [%d] (%d) stopped by signal %d\n", jp->jid, pid, WSTOPSIG(status));
+			if(jp->state == FG)
+				reaped = 1;
+			jp->state = ST;
+		} else if(WIFCONTINUED(status)) {
+			struct job_t *jp = getjobpid(jobs, pid);
+			if(jp->state != FG) jp->state = BG;
+		} else {
+			if(verbose)
+				printf("\n+ Terminate from pid %d\n", pid);
+			if(WIFSIGNALED(status))
+				printf("Job [%d] (%d) terminated by signal %d\n", pid2jid(pid), pid, WTERMSIG(status));
+			assert(deletejob(jobs, pid));
+			if(pid == wanted_pid)
+				reaped = 1;
+		}
+	}
+	errno = olderrno;
     return;
 }
 
@@ -273,6 +375,10 @@ void sigchld_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
+	pid_t pid = fgpid(jobs);
+	if(!pid) return;
+	if(kill(-pid, SIGINT) < 0)
+		unix_error("Kill error (sigint_handler)");
     return;
 }
 
@@ -283,6 +389,18 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
+	sigset_t cld, prev;
+	sigemptyset(&cld), sigaddset(&cld, SIGCHLD);
+	sigprocmask(SIG_BLOCK, &cld, &prev);
+
+	pid_t pid = fgpid(jobs);
+	if(!pid) return;
+	struct job_t *jp = getjobpid(jobs, pid);
+	jp->state = ST;
+	if(kill(-pid, SIGTSTP) < 0)
+		unix_error("Kill error (sigtstp_handler)");
+	reaped = 1;
+	sigprocmask(SIG_SETMASK, &prev, NULL);
     return;
 }
 
