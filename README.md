@@ -13,8 +13,8 @@ Book:
 | Chapter name                                        | Lecture | Reading |
 | --------------------------------------------------- | ------- | ------- |
 | Chapter 1 A tour of computer systems                |         | Yes     |
-| Chapter 2 Representing and manipulating information | Yes     | Partial |
-| Chapter 3 Machine-Level representation of programs  | Yes     |         |
+| Chapter 2 Representing and manipulating information |         | Yes     |
+| Chapter 3 Machine-Level representation of programs  | Yes     | Partial |
 | *Chapter 4 Processor architecture*                  |         |         |
 | Chapter 5 Optimizing program performance            | Yes     |         |
 | Chapter 6 The memory hierarchy                      | Yes     |         |
@@ -29,7 +29,7 @@ Labs:
 
 | Lab name          | Progress |
 | ----------------- | -------- |
-| Data lab          | 50%      |
+| Data lab          | 100%     |
 | Bomb lab          | 100%     |
 | Attack lab        | 95%      |
 | *Buffer lab*      |          |
@@ -38,5 +38,5 @@ Labs:
 | *Performance lab* |          |
 | Shell lab         | 100%     |
 | Malloc lab        |          |
-| Proxy lab         | 67%      |
+| Proxy lab         | 100%     |
 

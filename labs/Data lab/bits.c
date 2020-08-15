@@ -234,6 +234,8 @@ int isLessOrEqual(int x, int y) {
  *   Legal ops: ~ & ^ | + << >>
  *   Max ops: 12
  *   Rating: 4 
+ *   O(log log U) operations. 
+ *   Binary lifting to make most sig bit move toward least sig bit.
  */
 int logicalNeg(int x) {
     int f1 = x  | (x  >> 1);
@@ -254,19 +256,34 @@ int logicalNeg(int x) {
  *  Legal ops: ! ~ & ^ | + << >>
  *  Max ops: 90
  *  Rating: 4
+ *  Solution with O(log log U) operations. (binary lifting)
  */
-int howManyBits(int x) {/*
-    int ans = x >> 31 & 1, ce = ans << 4;
+int howManyBits(int x) {
+	/* Make it positive */
+    int neg = x >> 31 & 1;
+	int pos = !neg;
+	int ce = pos << 4;
+	int ans = 0;
+
+	/* Make it fit the form of 000...00111..1 */
     x = x ^ ((~0 << ce) << ce);
     x = x | (x >> 1);
     x = x | (x >> 2);
     x = x | (x >> 4);
     x = x | (x >> 8);
     x = x | (x >> 16);
-    ans = ans + (x >> 30 & 1);*/
-    
 
-    return 0;
+	/* To get proper index */
+	x <<= 1;
+	
+	/* Binary lifting to get the answer */
+    ans = ans + ((x >> (ans + 16) & 1) << 4);
+    ans = ans + ((x >> (ans + 8) & 1)  << 3);
+    ans = ans + ((x >> (ans + 4) & 1)  << 2);
+    ans = ans + ((x >> (ans + 2) & 1)  << 1);
+    ans = ans + ((x >> (ans + 1) & 1));
+
+    return ans + 1;
 }
 //float
 /* 
@@ -280,9 +297,26 @@ int howManyBits(int x) {/*
  *   Max ops: 30
  *   Rating: 4
  */
+#define EXPO 8
+#define FRAC 23
+#define F8   255
+#define F23  8388607
+#define P23  8388608
+#define INF  0x7f800000
+#define NINF 0xff800000
+
 unsigned floatScale2(unsigned uf) {
-  return 2;
+	int sgn = uf >> 31 & 1, exp = uf >> 23 & F8, frac = uf & F23;
+	if(exp == F8) return uf;
+	else if(exp == 254) return sgn ? NINF : INF;
+	else if(exp == 0) {
+		frac *= 2;
+		if(frac > F23)
+			exp = 1, frac -= P23;
+	} else exp++;
+	return (sgn << 31) | (exp << 23) | frac;
 }
+
 /* 
  * floatFloat2Int - Return bit-level equivalent of expression (int) f
  *   for floating point argument f.
@@ -294,9 +328,19 @@ unsigned floatScale2(unsigned uf) {
  *   Legal ops: Any integer/unsigned operations incl. ||, &&. also if, while
  *   Max ops: 30
  *   Rating: 4
+
+ *  Thanks to 23-bit fraction part precision, I won't need to care about 
+ *  INT_MAX != INT_MIN issues.
  */
+#define BIG 0x80000000u
 int floatFloat2Int(unsigned uf) {
-  return 2;
+	int sgn = uf >> 31 & 1, exp = (uf >> 23 & F8) - 127, res = 0, i;
+	if(exp < 0) return 0;
+	if(exp >= 32) return BIG;
+	for(i = 23; i >= 0 && exp >= 0; --i, --exp) {
+		if(i==23 ? 1 : (uf >> i & 1)) res += 1<<exp;
+	}
+	return sgn ? -res : res;
 }
 /* 
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
@@ -312,5 +356,13 @@ int floatFloat2Int(unsigned uf) {
  *   Rating: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+	if(x > 127) return INF;
+	if(x < -149) return 0;
+	x += 127;
+	if(x > 0) {
+		return x << 23;
+	} else {
+		x += 22;
+		return 1<<x;
+	}
 }
