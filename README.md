@@ -6,7 +6,7 @@ Practice codes, homework, labs, etc related to Computer Systems: A Programmer's 
 
 ## Progress
 
-*CS15-213 Introduction to Computer System* Lectures: 16 / 27
+*CS15-213 Introduction to Computer System* Lectures: 25 / 27
 
 Book:
 
