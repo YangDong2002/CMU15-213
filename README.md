@@ -32,9 +32,9 @@ Labs:
 | Data lab          | 50%      |
 | Bomb lab          | 100%     |
 | Attack lab        | 95%      |
-| Buffer lab        | 50%      |
+| *Buffer lab*      |          |
 | *Architecture lab*|          |
-| Cache lab         | 100%     |
+| Cache lab         | 50%      |
 | *Performance lab* |          |
 | Shell lab         | 100%     |
 | Malloc lab        |          |
