@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
 		}
 	}
 	if(verbose)
-		printf("Config: s = %ld, E = %ld, b = %ld, verbose = %ld\n", s, E, b, verbose);
+		printf("Config: s=%ld, E=%ld, b=%ld, verbose=%ld\n", s, E, b, verbose);
 	if(s == -1 || E == -1 || b == -1) {
 		printf("Usage: %s [-hv] -s <s> -E <E> -b <b> -t <traceile>\n", argv[0]);
 		exit(1);

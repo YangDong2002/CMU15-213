@@ -3,10 +3,11 @@
 Practice codes, homework, labs, etc related to Computer Systems: A Programmer's Perspective 3rd edition
 
 
-
 ## Progress
 
-*CS15-213 Introduction to Computer System* Lectures: 25 / 27
+I'm following the course *CMU CS15-213 Introduction to Computer System*.
+
+Lectures: 25 / 27
 
 Book:
 
@@ -32,11 +33,10 @@ Labs:
 | Data lab          | 100%     |
 | Bomb lab          | 100%     |
 | Attack lab        | 95%      |
-| *Buffer lab*      |          |
 | *Architecture lab*|          |
-| Cache lab         | 50%      |
+| Cache lab         | 91%      |
 | *Performance lab* |          |
 | Shell lab         | 100%     |
-| Malloc lab        |          |
+| Malloc lab        | 0%       |
 | Proxy lab         | 100%     |
 
