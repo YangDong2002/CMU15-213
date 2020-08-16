@@ -1,0 +1,10 @@
+Binary1:
+(Malloc 64, Malloc 448) * 1000
+Free 448 * 1000
+Malloc 512 * 1000
+
+Binary2:
+(Malloc 16, Malloc 112) * 1000
+Free 112 * 1000
+Malloc 128 * 1000
+Free * 2000

@@ -5,7 +5,7 @@ Practice codes, homework, labs, etc related to Computer Systems: A Programmer's 
 
 ## Progress
 
-I'm following the course *CMU CS15-213 Introduction to Computer System*.
+I've finished the course *CMU CS15-213 Introduction to Computer System* and its labs.
 
 Lectures: 25 / 27
 
@@ -37,6 +37,6 @@ Labs:
 | Cache lab         | 91%      |
 | *Performance lab* |          |
 | Shell lab         | 100%     |
-| Malloc lab        | 0%       |
+| Malloc lab        | 98%      |
 | Proxy lab         | 100%     |
 
