@@ -154,12 +154,12 @@ void *serve(void *fdp) {
 	fprintf(stderr, "Request headers: %s\n", buf);
 	if(sscanf(buf, "%s %s %s", method, uri, version) != 3) {
 		clienterror(fd, method, "400", "Bad request", "Proxy cannot understand this request.");
-		return 0;
+		goto End;
 	}
 
 	if(strcasecmp(method, "GET")) {
 		clienterror(fd, method, "501", "Not implemented", "Proxy does not implement this method");
-		return 0;
+		goto End;
 	}
 
 	/* Check cache */
@@ -172,7 +172,7 @@ void *serve(void *fdp) {
 		fprintf(stderr, "Cache miss...\n");
 		/* Deal with headers */
 		int o = 0, has_host = 0;
-		if(!parse_uri(fd, method, uri, host, port, new_uri)) return 0;
+		if(!parse_uri(fd, method, uri, host, port, new_uri)) goto End;
 		fprintf(stderr, "  Parsed host = %s, port = %s, new_uri = %s\n", host, port, new_uri);
 		o += sprintf(header + o, "%s %s HTTP/1.0\r\n", method, new_uri);
 		
@@ -206,7 +206,7 @@ void *serve(void *fdp) {
 		int destfd;
 		if((destfd = open_clientfd(host, port)) == -1) {
 			clienterror(fd, method, "403", "Forbidden", "Proxy cannot connect to the required url");
-			return 0;
+			goto End;
 		}
 		if(Rio_writen(destfd, header, (size_t)o) < 0) goto End;
 		ssize_t sz, totsz = 0;

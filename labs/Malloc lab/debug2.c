@@ -1,6 +1,6 @@
 
 /*
- * Author	  : Yang Dong
+ * Author      : Yang Dong
  * Created Time: 2020.08.15
  * Segregated free list, 32 bit machine.
  */
@@ -14,16 +14,16 @@
 #include "memlib.h"
 
 team_t team = {
-	/* Team name */
-	"Yang Dong",
-	/* First member's full name */
-	"Yang Dong",
-	/* First member's email address */
-	"yangdong2002@stu.xjtu.edu.cn",
-	/* Second member's full name (leave blank if none) */
-	"",
-	/* Second member's email address (leave blank if none) */
-	""
+    /* Team name */
+    "Yang Dong",
+    /* First member's full name */
+    "Yang Dong",
+    /* First member's email address */
+    "yangdong2002@stu.xjtu.edu.cn",
+    /* Second member's full name (leave blank if none) */
+    "",
+    /* Second member's email address (leave blank if none) */
+    ""
 };
 
 /* double word alignment, just ok for block structure. */
@@ -37,9 +37,9 @@ team_t team = {
 
 /*
  *  Free block structure:
- *	(is_allo, size), link_prev, link_next, [...], (is_allo, size)
+ *    (is_allo, size), link_prev, link_next, [...], (is_allo, size)
  *  Allocated block structure:
- *	(is_allo, size) [Content] (is_allo, size)
+ *    (is_allo, size) [Content] (is_allo, size)
  *  Pack up to 16 bytes.
  *
  * 32 Segregated lists: [1,1], [2,3], [4,7], [8,15], [16,31], ..., [1<<31, INF]
@@ -59,7 +59,6 @@ char **seglist;
 #define ALLOCATED 0x80000000u
 
 
-char *imgend;
 char *chk(char *p) { return (p < (char*)(seglist + 32) || p > (char *)mem_heap_hi()) ? NULL : p; }
 char *prev_block(char *p) { return p-WSIZE <= (char*)(seglist+32) ? NULL : p - SZ(p - WSIZE); }
 char *next_block(char *p) { return p+SZ(p) > (char*)(mem_heap_hi()) ? NULL : p + SZ(p); }
@@ -70,28 +69,34 @@ size_t backfree() { char *p = (char*)mem_heap_hi() - 3; return p < (char *)(segl
  * mm_check - print current status, check head == tail
  */
 int mm_check() {
+	printf("\n\nStarting mm_check... heap size = %u\n", mem_heapsize());
 	char *p = (char *)(seglist + 32);
 	while(p <= (char*)mem_heap_hi()) {
+		printf("Block at %p, size = %d, isallocated = %d", p, SZ(p), ISALLO(p));
 		if(GET(p) != GET(p + SZ(p) - WSIZE)) {
 			char *tail = p + SZ(p) - WSIZE;
 			printf("Error: inconsistent head & tail message in block %p: tail says size = %d, isallocated = %d\n", p, SZ(tail), ISALLO(tail));
 			return 0;
 		}
 		if(!ISALLO(p)) {
+			printf(" link_prev = %p, link_next = %p\n", (char *)LINK_PREV(p), (char *)LINK_NEXT(p));
 			if((LINK_PREV(p) && chk((char *)LINK_PREV(p)) == NULL) || (LINK_NEXT(p) && chk((char *)LINK_NEXT(p)) == NULL)) {
 				printf("Error: invalid pointer\n");
 				return 0;
 			}
-		}// else printf("\n");
+		} else printf("\n");
 		p += SZ(p);
 	}
 	if(p != (char *)mem_heap_hi()+1) {
 		printf("Error: in the end, p = %p, memheapend = %p, not equal!\n", p, (char*)mem_heap_hi()+1);
 		return 0;
 	}
+	printf("\nList headers: start = %p\n", seglist);
 	for(int i = 0; i < 32; ++i) {
+		printf("seglist[%d] = %p\n", i, seglist[i]);
 		char *p = seglist[i];
 		while(p) {
+			printf("  block %p: size = %d, allo = %d\n", p, SZ(p), ISALLO(p));
 			if(ISALLO(p) || SZ(p) < (1<<i) || SZ(p) >= (1<<(i+1))) {
 				printf("Error: size or allocation status is wrong!\n");
 				return 0;
@@ -116,12 +121,13 @@ int mm_init(void) {
 	seglist = (char **)p;
 	for(int i = 0; i < 32; ++i)
 		seglist[i] = NULL;
-	imgend = (char *)mem_heap_hi();
-	return 0;
+	assert(mm_check());
+    return 0;
 }
 
 /* erase node from seglist */
 void del(char *p) {
+	fprintf(stdout, "DELETING p = %p, sz = %d\n", p, SZ(p));
 	int id = getid(SZ(p));
 	unsigned pre = LINK_PREV(p), nxt = LINK_NEXT(p);
 	if(p == seglist[id]) seglist[id] = (char *)nxt; /* update header */
@@ -132,6 +138,7 @@ void del(char *p) {
 /* insert node into seglist. */
 void ins(char *p) {
 	int sz = SZ(p), id = getid(sz);
+	fprintf(stdout, "INSERTING p = %p, sz = %d, id = %d\n", p, sz, id);
 	LINK_NEXT(p) = (unsigned)seglist[id];
 	if(seglist[id]) LINK_PREV(seglist[id]) = (unsigned)p;
 	LINK_PREV(p) = 0;
@@ -142,8 +149,11 @@ void ins(char *p) {
 char *coalesce(char *p) {
 	assert(p);
 	char *pre = prev_block(p), *nxt = next_block(p), *head = p;
+	printf("Coalesce %p: pre = %p, nxt = %p\n", p, pre, nxt);
 	size_t siz = SZ(p);
 	del(p);
+	mm_check();
+	puts("FINSIH");
 	if(pre && !ISALLO(pre)) del(pre), head = pre, siz += SZ(pre);
 	if(nxt && !ISALLO(nxt)) del(nxt), siz += SZ(nxt);
 	SET(head, siz), SET(head+siz-WSIZE, siz);
@@ -152,12 +162,13 @@ char *coalesce(char *p) {
 }
 
 /*
- * Split a free block
- * Send left sz bytes (including head & tail) for user, and mark right part as free.
- * If right part is too small (< 16 bytes), then the whole part will be available to user.
- * return pointer toward free block head RHS.
+ * Split block
+ * Left sz bytes (including head & tail) for user, right part free.
+ * If right part is too small (< 16 bytes), then the whole part will belong to user.
+ * return pointer toward head element.
  */
 char *split(char *p, size_t sz) {
+	printf("split %p, %u\n", p, sz);
 	int avail = SZ(p);
 	assert(avail >= sz);
 	del(p);
@@ -167,16 +178,15 @@ char *split(char *p, size_t sz) {
 		SET(p+sz, avail - sz);
 		SET(p+avail-WSIZE, avail-sz);
 		ins(p + sz);
-		return p + sz;
 	} else { /* Send whole block to user */
 		GET(p) |= ALLOCATED;
 		GET(p+sz-WSIZE) |= ALLOCATED;
-		return NULL;
 	}
+	return p;
 }
 /* Extend mem_sbrk by sz bytes and update seglist */
 char *extend(size_t sz) {
-	imgend += sz;
+	printf("extend %u\n", sz);
 	assert(sz == ALIGN(sz));
 	sz = ALIGN(sz);
 	char *p = mem_sbrk(sz);
@@ -188,15 +198,11 @@ char *extend(size_t sz) {
 
 /* Find block with proper size. sz contains head & tail */
 char *find_fit(size_t sz) {
+	printf("Find_fit %u\n", sz);
 	int id = getid(sz);
-	for(int i = id; i < 32; ++i) {
-		char *cho = NULL;
-		for(char *p = seglist[i]; p && chk(p); p = (char *)LINK_NEXT(p)) {
-			if(SZ(p) >= sz && (cho == NULL || SZ(p) < SZ(cho)))
-				cho = p;
-		}
-		if(cho) return cho;
-	}
+	for(int i = id; i < 32; ++i)
+		for(char *p = seglist[i]; p && chk(p); p = (char *)LINK_NEXT(p)) if(SZ(p) >= sz)
+			return p;
 	size_t bk = backfree();
 	assert(sz > bk);
 	return extend(sz - bk);
@@ -204,62 +210,49 @@ char *find_fit(size_t sz) {
 
 /* 
  * mm_malloc - Allocate a block by incrementing the brk pointer.
- *	 Always allocate a block whose size is a multiple of the alignment.
+ *     Always allocate a block whose size is a multiple of the alignment.
  */
 void *mm_malloc(size_t size) {
-	//mm_check();
-	int g = imgend - (char *)mem_heap_hi();
-	assert(g >= 0);
-	if(g) mem_sbrk(g);
+	assert(mm_check());
+	printf("MALLOC %u\n", size);
 	size = ALIGN(size);
 	char *fit = find_fit(size + WSIZE + WSIZE);
-	split(fit, size + WSIZE + WSIZE);
-	return fit + WSIZE;
+	char *usr = split(fit, size + WSIZE + WSIZE);
+	assert(mm_check());
+	return usr + WSIZE;
 }
+
 /*
  * mm_free - Freeing a block and merge adjacent free blocks
  */
 void mm_free(void *ptr) {
-	//mm_check();
-	int g = imgend - (char *)mem_heap_hi();
-	assert(g >= 0);
-	if(g) mem_sbrk(g);
-
+	printf("FREE %p\n", ptr);
 	char *p = (char *)ptr - WSIZE;
 	assert(ISALLO(p));
 	int sz = SZ(p);
 	SET(p, sz), SET(p+sz-WSIZE, sz);
 	ins(p);
 	coalesce(p);
+	assert(mm_check());
+	printf("MM_FREE OVER\n");
 }
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
 void *mm_realloc(void *ptr, size_t size) {
-	//mm_check();
-
-	size = ALIGN(size);
-	if(ptr == NULL) return mm_malloc(size);
-	if(size == 0) { mm_free(ptr); return NULL; }
-
-	char *oldptr = ptr, *oldhead = (char *)ptr - WSIZE;
-	int sz = SZ(oldhead), dem = size+WSIZE+WSIZE;
-	if(sz >= dem) { /* original size is enough */
-		if(sz >= dem+WSIZE*4) { /* available for new block */
-			SET(oldhead, ALLOCATED | dem);
-			SET(oldhead+dem-1, ALLOCATED | dem);
-			SET(oldhead+dem, sz - dem);
-			SET(oldhead+sz-1, sz - dem);
-			ins(oldhead+dem);
-			coalesce(oldhead+dem);
-		}
-		return ptr; /* leave it unchanged */
-	}
-
-	void *newptr = mm_malloc(size);
-	if (newptr == NULL)
-		return NULL;
-	memcpy(newptr, oldptr, SZ(oldhead) - WSIZE - WSIZE);
-	mm_free(oldptr);
-	return newptr;
+	printf("MM_REALLOC %p, %u\n", ptr, size);
+    void *oldptr = ptr;
+    void *newptr;
+    size_t copySize;
+    
+    newptr = mm_malloc(size);
+    if (newptr == NULL)
+      return NULL;
+    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+    if (size < copySize)
+      copySize = size;
+    memcpy(newptr, oldptr, copySize);
+    mm_free(oldptr);
+	assert(mm_check());
+    return newptr;
 }
