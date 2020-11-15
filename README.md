@@ -1,13 +1,15 @@
-# CSAPP-Practices
+# CMU 15-213
 
-Practice codes, homework, labs, etc related to Computer Systems: A Programmer's Perspective 3rd edition
+Practice codes, homework, labs, etc related to 15-213 Introduction to Computer System.
+
+Textbook: *Computer Systems: A Programmer's Perspective 3rd edition*
 
 
 ## Progress
 
-I've finished the course *CMU CS15-213 Introduction to Computer System* and its labs.
+I've finished the course *CMU CS15-213 Introduction to Computer System* and corresponding labs.
 
-Lectures: 25 / 27
+Lectures: 27 / 27
 
 Book:
 
